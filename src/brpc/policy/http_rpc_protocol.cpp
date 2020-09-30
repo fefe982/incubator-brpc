@@ -17,6 +17,7 @@
 
 
 #include <google/protobuf/descriptor.h>             // MethodDescriptor
+#include <google/protobuf/util/json_util.h>
 #include <gflags/gflags.h>
 #include <json2pb/pb_to_json.h>                    // ProtoMessageToJson
 #include <json2pb/json_to_pb.h>                    // JsonToProtoMessage
@@ -428,13 +429,22 @@ void ProcessHttpResponse(InputMessageBase* msg) {
             }
         } else if (content_type == HTTP_CONTENT_JSON) {
             // message body is json
-            butil::IOBufAsZeroCopyInputStream wrapper(res_body);
-            std::string err;
-            json2pb::Json2PbOptions options;
-            options.base64_to_bytes = cntl->has_pb_bytes_to_base64();
-            if (!json2pb::JsonToProtoMessage(&wrapper, cntl->response(), options, &err)) {
-                cntl->SetFailed(ERESPONSE, "Fail to parse content, %s", err.c_str());
-                break;
+            if (cntl->has_use_protobuf_json_util()) {
+                google::protobuf::util::Status status =
+                    google::protobuf::util::JsonStringToMessage(res_body.to_string(), cntl->response());
+                if (status != google::protobuf::util::Status::OK) {
+                    cntl->SetFailed(ERESPONSE, "Fail to parse content, %s", status.error_message().as_string().c_str());
+                    break;
+                }
+            } else {
+                butil::IOBufAsZeroCopyInputStream wrapper(res_body);
+                std::string err;
+                json2pb::Json2PbOptions options;
+                options.base64_to_bytes = cntl->has_pb_bytes_to_base64();
+                if (!json2pb::JsonToProtoMessage(&wrapper, cntl->response(), options, &err)) {
+                    cntl->SetFailed(ERESPONSE, "Fail to parse content, %s", err.c_str());
+                    break;
+                }
             }
         } else {
             cntl->SetFailed(ERESPONSE,
@@ -506,19 +516,33 @@ void SerializeHttpRequest(butil::IOBuf* /*not used*/,
                                        pbreq->GetTypeName().c_str());
             }
         } else if (content_type == HTTP_CONTENT_JSON) {
-            std::string err;
-            json2pb::Pb2JsonOptions opt;
-            opt.bytes_to_base64 = cntl->has_pb_bytes_to_base64();
-            opt.jsonify_empty_array = cntl->has_pb_jsonify_empty_array();
-            opt.always_print_primitive_fields = cntl->has_always_print_primitive_fields();
-            
-            opt.enum_option = (FLAGS_pb_enum_as_number
-                               ? json2pb::OUTPUT_ENUM_BY_NUMBER
-                               : json2pb::OUTPUT_ENUM_BY_NAME);
-            if (!json2pb::ProtoMessageToJson(*pbreq, &wrapper, opt, &err)) {
-                cntl->request_attachment().clear();
-                return cntl->SetFailed(
-                    EREQUEST, "Fail to convert request to json, %s", err.c_str());
+            if (cntl->has_use_protobuf_json_util()) {
+                google::protobuf::util::JsonOptions opt;
+                opt.always_print_enums_as_ints = FLAGS_pb_enum_as_number;
+                opt.always_print_primitive_fields = cntl->has_always_print_primitive_fields();
+                opt.preserve_proto_field_names = true;
+                std::string output;
+                google::protobuf::util::Status status = google::protobuf::util::MessageToJsonString(*pbreq, &output);
+                if (status != google::protobuf::util::Status::OK) {
+                    return cntl->SetFailed(
+                        EREQUEST, "Fail to convert request to json, %s", status.error_message().as_string().c_str());
+                }
+                cntl->request_attachment().append(output);
+            } else {
+                std::string err;
+                json2pb::Pb2JsonOptions opt;
+                opt.bytes_to_base64 = cntl->has_pb_bytes_to_base64();
+                opt.jsonify_empty_array = cntl->has_pb_jsonify_empty_array();
+                opt.always_print_primitive_fields = cntl->has_always_print_primitive_fields();
+                
+                opt.enum_option = (FLAGS_pb_enum_as_number
+                                ? json2pb::OUTPUT_ENUM_BY_NUMBER
+                                : json2pb::OUTPUT_ENUM_BY_NAME);
+                if (!json2pb::ProtoMessageToJson(*pbreq, &wrapper, opt, &err)) {
+                    cntl->request_attachment().clear();
+                    return cntl->SetFailed(
+                        EREQUEST, "Fail to convert request to json, %s", err.c_str());
+                }
             }
         } else {
             return cntl->SetFailed(

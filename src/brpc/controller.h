@@ -141,6 +141,7 @@ friend void policy::ProcessThriftRequest(InputMessageBase*);
     static const uint32_t FLAGS_ENABLED_CIRCUIT_BREAKER = (1 << 17);
     static const uint32_t FLAGS_ALWAYS_PRINT_PRIMITIVE_FIELDS = (1 << 18);
     static const uint32_t FLAGS_HEALTH_CHECK_CALL = (1 << 19);
+    static const uint32_t FLAGS_USE_PROTOBUF_JSON_UTIL = (1 << 20);
     
 public:
     Controller();
@@ -313,6 +314,10 @@ public:
     void set_always_print_primitive_fields(bool f) { set_flag(FLAGS_ALWAYS_PRINT_PRIMITIVE_FIELDS, f); }
     bool has_always_print_primitive_fields() const { return has_flag(FLAGS_ALWAYS_PRINT_PRIMITIVE_FIELDS); }
     
+
+    // Use protobuf json util to convert message from/to json
+    void set_use_protobuf_json_util(bool f) { set_flag(FLAGS_USE_PROTOBUF_JSON_UTIL, f); }
+    bool has_use_protobuf_json_util() const { return has_flag(FLAGS_USE_PROTOBUF_JSON_UTIL); }
 
     // Tell RPC that done of the RPC can be run in the same thread where
     // the RPC is issued, otherwise done is always run in a different thread.
