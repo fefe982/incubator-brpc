@@ -526,7 +526,7 @@ void SerializeHttpRequest(butil::IOBuf* /*not used*/,
                 opt.always_print_primitive_fields = cntl->has_always_print_primitive_fields();
                 opt.preserve_proto_field_names = true;
                 std::string output;
-                google::protobuf::util::Status status = google::protobuf::util::MessageToJsonString(*pbreq, &output);
+                google::protobuf::util::Status status = google::protobuf::util::MessageToJsonString(*pbreq, &output, opt);
                 if (status != google::protobuf::util::Status::OK) {
                     return cntl->SetFailed(
                         EREQUEST, "Fail to convert request to json, %s", status.error_message().as_string().c_str());
@@ -782,7 +782,7 @@ HttpResponseSender::~HttpResponseSender() {
                 opt.always_print_primitive_fields = cntl->has_always_print_primitive_fields();
                 opt.preserve_proto_field_names = true;
                 std::string output;
-                google::protobuf::util::Status status = google::protobuf::util::MessageToJsonString(*res, &output);
+                google::protobuf::util::Status status = google::protobuf::util::MessageToJsonString(*res, &output, opt);
                 if (status != google::protobuf::util::Status::OK) {
                     cntl->SetFailed(ERESPONSE, "Fail to convert response to json, %s", status.error_message().as_string().c_str());
                 }
